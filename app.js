@@ -13,6 +13,27 @@ const FIXED_CATEGORIES = [
   { id: 'modificaciones-ios', key: 'category_ios_modifications', fallback: 'Modificaciones iOS', aliases: ['modificaciones ios', 'modificación ios', 'ios modifications', 'ios modification'], symbol: '⌘' },
 ];
 
+const HEADER_MAP = Object.freeze({
+  id: 'id', sku: 'id', codigo: 'id',
+  product_id: 'product_id', id_producto: 'product_id', id_del_producto: 'product_id', idproducto: 'product_id',
+  name: 'name', name_es: 'name', nombre: 'name', producto: 'name', producto_es: 'name',
+  category: 'category', categoria: 'category', seccion: 'category',
+  description: 'description', descripcion: 'description', detalle: 'description',
+  image_url: 'image_url', foto_url: 'image_url', foto_url_publica: 'image_url', imagen_url: 'image_url', foto: 'image_url', imagen: 'image_url',
+  active: 'active', activo: 'active', estado: 'active',
+  name_en: 'name_en', nombre_en: 'name_en', producto_en: 'name_en',
+  category_en: 'category_en', categoria_en: 'category_en',
+  description_en: 'description_en', descripcion_en: 'description_en',
+  badge: 'badge', etiqueta: 'badge', distintivo: 'badge',
+  badge_en: 'badge_en', etiqueta_en: 'badge_en',
+  sort_order: 'sort_order', orden: 'sort_order',
+  option_name: 'option_name', opcion: 'option_name', nombre_opcion: 'option_name', plan: 'option_name',
+  option_name_en: 'option_name_en', opcion_en: 'option_name_en', nombre_opcion_en: 'option_name_en',
+  price: 'price', precio: 'price', precio_cop: 'price',
+  duration: 'duration', duracion: 'duration', vigencia: 'duration',
+  duration_en: 'duration_en', duracion_en: 'duration_en',
+});
+
 const ui = {
   heroTitle: document.querySelector('#hero-title'),
   navWhatsapp: document.querySelector('#whatsapp-nav'),
@@ -74,7 +95,17 @@ function isActive(value, defaultValue = true) {
 }
 
 function normaliseKey(value) {
-  return clean(value).toLowerCase().replace(/\s+/g, '_');
+  return clean(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
+
+function canonicalHeader(value, index) {
+  const key = normaliseKey(value);
+  return HEADER_MAP[key] || key || `col_${index + 1}`;
 }
 
 function normaliseCategory(value) {
@@ -94,7 +125,7 @@ function gvizCellValue(cell) {
 
 function tableRows(table) {
   if (!table?.rows?.length) return [];
-  const headers = (table.rows[0].c || []).map((cell, index) => normaliseKey(gvizCellValue(cell)) || `col_${index + 1}`);
+  const headers = (table.rows[0].c || []).map((cell, index) => canonicalHeader(gvizCellValue(cell), index));
   return table.rows.slice(1).map((row) => {
     const cells = row.c || [];
     return Object.fromEntries(headers.map((header, index) => [header, gvizCellValue(cells[index])]));
@@ -493,7 +524,12 @@ async function syncStore() {
       .filter((product) => clean(product.id) && (clean(product.name) || clean(product.name_en)) && isActive(product.active))
       .sort((a, b) => (Number(a.sort_order) || 9999) - (Number(b.sort_order) || 9999));
 
-    const optionRows = await loadPublicTab('Opciones');
+    let optionRows;
+    try {
+      optionRows = await loadPublicTab('Precios');
+    } catch {
+      optionRows = await loadPublicTab('Opciones');
+    }
     options = optionRows.filter((option) => clean(option.product_id) && isActive(option.active));
     renderProducts();
     setSyncState('ready');
