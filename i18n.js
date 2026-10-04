@@ -28,6 +28,7 @@
     footer_message: 'Not for everyone.', footer_highlight: "And that's fine.",
     footer_group_label: 'Join the group', footer_whatsapp_label: 'WhatsApp', footer_tagline: 'FATDAR AFTER DARK', credits: 'dixz',
     detail_option_heading: 'PRICE / DURATION', detail_option_hint: 'YOUR OPTION. YOUR CALL →',
+    quantity_label: 'Quantity', duration_label: 'Duration',
     detail_note: 'Choose an option and continue on WhatsApp.', detail_no_options: 'Message us on WhatsApp to check available options.',
     search_products: 'Search products', refresh_catalog: 'Refresh catalog',
     category_navigation: 'Catalog sections', main_navigation: 'Main navigation',

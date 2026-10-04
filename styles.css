@@ -377,3 +377,7 @@ main { overflow: hidden; }
   .footer-bottom { align-items: flex-start; flex-direction: column; }
   .footer-meta { width: 100%; justify-content: space-between; }
 }
+
+
+/* Detalles del paquete capturados desde la misma fila del catálogo. */
+.option-meta { display: block; margin-top: 5px; color: var(--muted, #b7adb3); font-size: 11px; line-height: 1.5; }

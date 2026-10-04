@@ -28,9 +28,10 @@ const HEADER_MAP = Object.freeze({
   badge_en: 'badge_en', etiqueta_en: 'badge_en',
   sort_order: 'sort_order', orden: 'sort_order',
   option_name: 'option_name', opcion: 'option_name', nombre_opcion: 'option_name', plan: 'option_name',
+  opcion_paquete: 'option_name', cantidad: 'quantity', cantidad_unidad: 'quantity', cantidad_en: 'quantity_en',
   option_name_en: 'option_name_en', opcion_en: 'option_name_en', nombre_opcion_en: 'option_name_en',
   price: 'price', precio: 'price', precio_cop: 'price',
-  duration: 'duration', duracion: 'duration', vigencia: 'duration',
+  duration: 'duration', duracion: 'duration', vigencia: 'duration', tiempo_duracion: 'duration',
   duration_en: 'duration_en', duracion_en: 'duration_en',
 });
 
@@ -268,7 +269,11 @@ function productCategoryValues(product) {
 
 function searchableProduct(product) {
   const locale = window.FATDAR_I18N?.language === 'en' ? 'en' : 'es';
-  return [product.name, product.name_en, product.category, product.category_en, product.description, product.description_en]
+  const offerText = productOptions(product).flatMap((option) => [
+    option.option_name, option.option_name_en, option.quantity, option.quantity_en,
+    option.duration, option.duration_en, option.price,
+  ]);
+  return [product.name, product.name_en, product.category, product.category_en, product.description, product.description_en, ...offerText]
     .map(clean).join(' ').toLocaleLowerCase(locale);
 }
 
@@ -486,13 +491,22 @@ function openProduct(product) {
       button.type = 'button';
       button.className = 'option-button';
       const optionName = localizedField(option, 'option_name', copy('option_fallback', 'Opción'));
+      const quantity = localizedField(option, 'quantity');
       const duration = localizedField(option, 'duration');
-      button.innerHTML = `<span><span class="option-name">${escapeHtml(optionName)}</span>${duration ? `<span class="option-duration">${escapeHtml(duration)}</span>` : ''}</span><span class="option-price">${escapeHtml(formatPrice(option.price))}</span><span class="option-arrow" aria-hidden="true">↗</span>`;
+      const optionMeta = [
+        quantity ? `${copy('quantity_label', 'Cantidad')}: ${quantity}` : '',
+        duration ? `${copy('duration_label', 'Duración')}: ${duration}` : '',
+      ].filter(Boolean).join(' · ');
+      button.innerHTML = `<span><span class="option-name">${escapeHtml(optionName)}</span>${optionMeta ? `<span class="option-meta">${escapeHtml(optionMeta)}</span>` : ''}</span><span class="option-price">${escapeHtml(formatPrice(option.price))}</span><span class="option-arrow" aria-hidden="true">↗</span>`;
       button.addEventListener('click', () => {
         const brand = copy('brand', 'FATDAR');
+        const details = [
+          quantity ? `${copy('quantity_label', 'Cantidad')}: ${quantity}` : '',
+          duration ? `${copy('duration_label', 'Duración')}: ${duration}` : '',
+        ].filter(Boolean).join(' | ');
         const message = window.FATDAR_I18N?.language === 'en'
-          ? `Hi ${brand}, I'm interested in ${productName} — ${optionName}${duration ? ` (${duration})` : ''} for ${formatPrice(option.price)}.`
-          : `Hola ${brand}, me interesa ${productName} — ${optionName}${duration ? ` (${duration})` : ''} por ${formatPrice(option.price)}.`;
+          ? `Hi ${brand}, I'm interested in ${productName} — ${optionName}${details ? ` | ${details}` : ''} for ${formatPrice(option.price)}.`
+          : `Hola ${brand}, me interesa ${productName} — ${optionName}${details ? ` | ${details}` : ''} por ${formatPrice(option.price)}.`;
         window.location.assign(waHref(message));
       });
       ui.optionList.append(button);
@@ -511,6 +525,32 @@ function setSyncState(kind) {
   ui.syncState.replaceChildren(indicator, document.createTextNode(` ${copy(key, fallback)}`));
 }
 
+function catalogFromRows(rows) {
+  const activeOffers = rows.filter((row) => {
+    const id = clean(row.product_id) || clean(row.id);
+    return id && (clean(row.name) || clean(row.name_en)) && isActive(row.active);
+  });
+  const productsById = new Map();
+  const offers = activeOffers.map((row, index) => {
+    const productId = clean(row.product_id) || clean(row.id);
+    const offer = { ...row, id: productId, product_id: productId, option_id: `${productId}-${index + 1}` };
+    if (!productsById.has(productId)) {
+      productsById.set(productId, offer);
+    } else {
+      const product = productsById.get(productId);
+      ['name', 'name_en', 'category', 'category_en', 'description', 'description_en', 'image_url', 'badge', 'badge_en']
+        .forEach((field) => {
+          if (!clean(product[field]) && clean(offer[field])) product[field] = offer[field];
+        });
+    }
+    return {
+      ...offer,
+      option_name: clean(row.option_name) || clean(row.quantity) || clean(row.duration) || copy('option_fallback', 'Opción'),
+    };
+  });
+  return { products: [...productsById.values()], options: offers };
+}
+
 async function syncStore() {
   setSyncState('loading');
   try {
@@ -518,19 +558,11 @@ async function syncStore() {
     storeConfig = Object.fromEntries(configRows.map((row) => [normaliseKey(row.key), clean(row.value)]));
     applyConfig();
 
-    // Google Visualization devuelve JSONP por callback global; consulta las pestañas en secuencia.
-    const productRows = await loadPublicTab('Productos');
-    products = productRows
-      .filter((product) => clean(product.id) && (clean(product.name) || clean(product.name_en)) && isActive(product.active))
-      .sort((a, b) => (Number(a.sort_order) || 9999) - (Number(b.sort_order) || 9999));
-
-    let optionRows;
-    try {
-      optionRows = await loadPublicTab('Precios');
-    } catch {
-      optionRows = await loadPublicTab('Opciones');
-    }
-    options = optionRows.filter((option) => clean(option.product_id) && isActive(option.active));
+    // Cada fila de Productos es una oferta; filas con el mismo ID se agrupan bajo una tarjeta.
+    const catalogRows = await loadPublicTab('Productos');
+    const catalog = catalogFromRows(catalogRows);
+    products = catalog.products;
+    options = catalog.options;
     renderProducts();
     setSyncState('ready');
   } catch (error) {
