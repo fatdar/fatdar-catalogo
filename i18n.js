@@ -1,5 +1,6 @@
 (() => {
-  const language = window.location.pathname.startsWith('/en/') ? 'en' : 'es';
+  const pathSegments = window.location.pathname.split('/').filter(Boolean);
+  const language = pathSegments[pathSegments.length - 1] === 'en' ? 'en' : 'es';
   const EN = {
     seo_title: 'FATDAR | Gaming, virtual numbers & iOS',
     meta_description: "Browse FATDAR's Android, iOS, virtual number and gaming categories. Ask on WhatsApp about current options.",
