@@ -1,6 +1,6 @@
 const FATDAR_SHEET_ID = '1TQM0CIUP1Zt9B7Bv1vr3Pdz4CDXXjQhWx8_ZBqYcTPo';
 const GOOGLE_GVIZ = `https://docs.google.com/spreadsheets/d/${FATDAR_SHEET_ID}/gviz/tq`;
-const DEFAULT_GROUP = 'https://chat.whatsapp.com/LvckI7GxibX4huZOlDlSZ7?mode=gi_';
+const DEFAULT_GROUP = 'https://chat.whatsapp.com/HGdGnYAa3q1BrjX7TWFFol?mode=gi_t';
 const DEFAULT_PHONE = '573104597592';
 
 const FIXED_CATEGORIES = [
